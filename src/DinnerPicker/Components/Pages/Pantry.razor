@@ -1,0 +1,89 @@
+@page "/pantry"
+@rendermode InteractiveServer
+@inject IPantryService PantrySvc
+
+<PageTitle>Pantry — NOSH</PageTitle>
+
+<div class="page-container">
+    <div class="page-header">
+        <a href="/" class="back-btn" title="Home">&#8592;</a>
+        <h1>Pantry Staples</h1>
+        <p class="muted">These ingredients are always assumed to be in your kitchen. Edit whenever your staples change.</p>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_message))
+    {
+        <div class="alert @(_isError ? "alert-error" : "alert-success")">@_message</div>
+    }
+
+    <div class="pantry-grid">
+        @foreach (var item in PantrySvc.GetPantryStaples())
+        {
+            <div class="pantry-item" @key="item">
+                <span>@item</span>
+                <button class="btn-remove" @onclick="() => RemoveStaple(item)" title="Remove">×</button>
+            </div>
+        }
+    </div>
+
+    <div class="pantry-actions">
+        <div class="add-row">
+            <input class="input"
+                   placeholder="Add an ingredient..."
+                   value="@_newItem"
+                   @oninput="e => _newItem = e.Value?.ToString() ?? string.Empty"
+                   @onkeydown="HandleAddKeyDown" />
+            <button class="btn btn-primary" @onclick="AddStaple">Add</button>
+        </div>
+
+        <div class="action-row">
+            <button class="btn btn-ghost" @onclick="ResetToDefaults">Reset to defaults</button>
+            <span class="muted small">@PantrySvc.GetPantryStaples().Count items</span>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string _newItem = "";
+    private string _message = "";
+    private bool _isError = false;
+
+    private void AddStaple()
+    {
+        var item = _newItem.Trim();
+        if (string.IsNullOrEmpty(item)) return;
+
+        if (PantrySvc.AddStaple(item))
+        {
+            _newItem = "";
+            ShowMessage($"'{item}' added to pantry.", error: false);
+        }
+        else
+        {
+            ShowMessage($"'{item}' is already in your pantry.", error: true);
+        }
+    }
+
+    private void RemoveStaple(string item)
+    {
+        PantrySvc.RemoveStaple(item);
+        ShowMessage($"'{item}' removed.", error: false);
+    }
+
+    private void ResetToDefaults()
+    {
+        PantrySvc.ResetToDefaults();
+        ShowMessage("Pantry reset to defaults.", error: false);
+    }
+
+    private void HandleAddKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") AddStaple();
+    }
+
+    private void ShowMessage(string msg, bool error)
+    {
+        _message = msg;
+        _isError = error;
+    }
+}

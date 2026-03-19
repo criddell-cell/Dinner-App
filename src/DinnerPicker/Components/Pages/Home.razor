@@ -1,0 +1,73 @@
+@page "/"
+@rendermode InteractiveServer
+@inject IPantryService PantrySvc
+@inject IHistoryService HistorySvc
+@inject NavigationManager Nav
+
+<PageTitle>NOSH</PageTitle>
+
+<div class="home">
+    <div class="home-banner">
+        <img src="nosh-logo-text.jpg" alt="NOSH" class="home-banner-logo" />
+    </div>
+
+    <div class="hero">
+        <div class="hero-text">
+            <h1>What's for dinner tonight?</h1>
+            <p>Answer a quick quiz and get 3 personalised home-cooked suggestions — 2 from what you have, 1 worth a quick shop.</p>
+        </div>
+        <a href="/session" class="btn btn-primary btn-lg">Start Tonight's Session →</a>
+    </div>
+
+    <div class="home-cards">
+        <div class="info-card">
+            <div class="info-card-icon">🥫</div>
+            <h3>Pantry Staples</h3>
+            <p>@PantrySvc.GetPantryStaples().Count items always on hand</p>
+            <a href="/pantry" class="btn btn-ghost">Manage →</a>
+        </div>
+
+        <div class="info-card">
+            <div class="info-card-icon">🥦</div>
+            <h3>Fridge</h3>
+            @if (PantrySvc.GetFridgeContents().Count > 0)
+            {
+                <p>@PantrySvc.GetFridgeContents().Count fresh item@(PantrySvc.GetFridgeContents().Count == 1 ? "" : "s") logged</p>
+                <p class="muted small">@string.Join(", ", PantrySvc.GetFridgeContents().Take(3))@(PantrySvc.GetFridgeContents().Count > 3 ? "..." : "")</p>
+            }
+            else
+            {
+                <p class="muted">Nothing logged yet</p>
+            }
+            <a href="/session" class="btn btn-ghost">Update →</a>
+        </div>
+
+        <div class="info-card">
+            <div class="info-card-icon">📋</div>
+            <h3>Recent History</h3>
+            @{
+                var recent = HistorySvc.GetAllHistory().Take(3).ToList();
+            }
+            @if (recent.Any())
+            {
+                @foreach (var entry in recent)
+                {
+                    <p class="small">@entry.Date.ToString("MMM d") — @entry.SelectedMeal</p>
+                }
+            }
+            else
+            {
+                <p class="muted">No sessions yet</p>
+            }
+            <a href="/history" class="btn btn-ghost">View all →</a>
+        </div>
+    </div>
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        if (PantrySvc.IsFirstRun)
+            Nav.NavigateTo("/setup");
+    }
+}

@@ -1,0 +1,23 @@
+@inherits LayoutComponentBase
+
+<div class="app-shell">
+    <header class="app-header">
+        <a href="/" class="logo">NOSH</a>
+        <div class="header-right">
+            <nav>
+                <a href="/session">Tonight's Dinner</a>
+                <a href="/pantry">Pantry</a>
+                <a href="/history">History</a>
+            </nav>
+            <SettingsButton />
+        </div>
+    </header>
+
+    <main class="app-main">
+        @Body
+    </main>
+
+    <footer class="app-footer">
+        <span>NOSH — Home-cooked. Healthy. Fast.</span>
+    </footer>
+</div>

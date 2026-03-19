@@ -1,0 +1,93 @@
+@rendermode InteractiveServer
+@inject IPantryService PantrySvc
+
+<button class="settings-btn" @onclick="OpenSettings" title="Settings">
+    <span class="material-icons">settings</span>
+</button>
+
+@if (_showSettings)
+{
+    <div class="modal-overlay" @onclick="CloseSettings">
+        <div class="modal" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h2>Settings</h2>
+                <button class="modal-close" @onclick="CloseSettings">✕</button>
+            </div>
+
+            <div class="modal-body">
+                <h3>Excluded Ingredients</h3>
+                <p class="muted small">Allergies or foods you dislike. These will never appear in suggestions.</p>
+
+                <div class="exclusion-add-row">
+                    <input class="input"
+                           placeholder="e.g. peanuts, shellfish, mushrooms..."
+                           @bind="_exclusionInput"
+                           @onkeydown="HandleExclusionKey" />
+                    <button class="btn btn-primary" @onclick="AddExclusion">Add</button>
+                </div>
+
+                @if (!string.IsNullOrEmpty(_exclusionMessage))
+                {
+                    <p class="small @(_exclusionError ? "text-error" : "text-success")">@_exclusionMessage</p>
+                }
+
+                @if (PantrySvc.GetExclusions().Count > 0)
+                {
+                    <div class="exclusion-chips">
+                        @foreach (var item in PantrySvc.GetExclusions())
+                        {
+                            <div class="exclusion-chip" @key="item">
+                                <span>@item</span>
+                                <button class="btn-remove" @onclick="() => RemoveExclusion(item)">×</button>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <p class="muted small">No exclusions set.</p>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _showSettings;
+    private string _exclusionInput = "";
+    private string _exclusionMessage = "";
+    private bool _exclusionError;
+
+    private void OpenSettings()  => _showSettings = true;
+    private void CloseSettings() => _showSettings = false;
+
+    private void AddExclusion()
+    {
+        var item = _exclusionInput.Trim();
+        if (string.IsNullOrEmpty(item)) return;
+
+        if (PantrySvc.AddExclusion(item))
+        {
+            _exclusionInput = "";
+            _exclusionMessage = $"'{item}' added.";
+            _exclusionError = false;
+        }
+        else
+        {
+            _exclusionMessage = $"'{item}' is already excluded.";
+            _exclusionError = true;
+        }
+    }
+
+    private void RemoveExclusion(string item)
+    {
+        PantrySvc.RemoveExclusion(item);
+        _exclusionMessage = $"'{item}' removed.";
+        _exclusionError = false;
+    }
+
+    private void HandleExclusionKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") AddExclusion();
+    }
+}

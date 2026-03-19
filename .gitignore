@@ -1,0 +1,14 @@
+# API keys and secrets
+src/DinnerPicker/Properties/launchSettings.json
+
+# .NET build output
+bin/
+obj/
+
+# User-specific files
+*.user
+*.suo
+.vs/
+
+# macOS
+.DS_Store

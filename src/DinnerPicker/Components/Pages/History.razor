@@ -1,0 +1,260 @@
+@page "/history"
+@rendermode InteractiveServer
+@inject IHistoryService HistorySvc
+@using Microsoft.AspNetCore.Components.Forms
+
+<PageTitle>Meals — NOSH</PageTitle>
+
+<div class="page-container">
+
+@if (_viewing != null)
+{
+    // ── View-only recipe detail ────────────────────────────────────────────
+    <div class="page-header">
+        <button class="btn btn-ghost" @onclick="CloseDetail">← Back</button>
+    </div>
+
+    <div class="complete-screen">
+        <h1>@_viewing.SelectedMeal</h1>
+
+        @if (_viewing.FullMeal != null)
+        {
+            var meal = _viewing.FullMeal;
+            <div class="complete-meal-card">
+                <div class="suggestion-meta">
+                    <span class="cuisine-tag">@meal.Cuisine</span>
+                    <span class="time-tag">⏱ @meal.EstimatedMinutes min</span>
+                    @if (meal.Rating > 0)
+                    {
+                        <span class="rating-tag">@RatingStars(meal.Rating) @meal.Rating.ToString("0.0")</span>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(meal.Appliance))
+                    {
+                        <span class="time-tag">🔥 @meal.Appliance</span>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(meal.Equipment))
+                    {
+                        <span class="time-tag">🍳 @meal.Equipment</span>
+                    }
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(meal.HealthNotes))
+                {
+                    <p class="health-note">🌿 @meal.HealthNotes</p>
+                }
+
+                @* ── Photo ── *@
+                @if (!string.IsNullOrEmpty(_viewing.PhotoFileName))
+                {
+                    <img src="/meal-photos/@_viewing.PhotoFileName"
+                         alt="@_viewing.SelectedMeal"
+                         class="meal-photo" />
+                }
+
+                <div class="meal-photo-upload">
+                    <label>
+                        📷 @(string.IsNullOrEmpty(_viewing.PhotoFileName) ? "Add photo" : "Replace photo")
+                        <InputFile OnChange="UploadPhoto" accept="image/*" />
+                    </label>
+                    @if (_uploading)
+                    {
+                        <span class="muted small">Saving…</span>
+                    }
+                </div>
+
+                <div class="ingredient-section">
+                    <h4>Ingredients</h4>
+                    <div class="ingredient-list">
+                        @foreach (var ing in meal.Ingredients)
+                        {
+                            <span class="ingredient-chip">@ing</span>
+                        }
+                        @foreach (var ing in meal.MissingIngredients)
+                        {
+                            <span class="ingredient-chip ingredient-chip-buy">@ing</span>
+                        }
+                    </div>
+                </div>
+
+                @if (meal.RecipeSteps.Count > 0)
+                {
+                    <div class="recipe-steps-section">
+                        <h4>Method</h4>
+                        <ol class="recipe-steps">
+                            @foreach (var step in meal.RecipeSteps)
+                            {
+                                <li>@step</li>
+                            }
+                        </ol>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <p class="muted">Full recipe details not available for this entry.</p>
+        }
+
+        <div class="complete-actions">
+            <button class="btn btn-ghost" @onclick="CloseDetail">← Back to history</button>
+        </div>
+    </div>
+}
+else
+{
+    // ── Tabs + list ───────────────────────────────────────────────────────
+    <div class="page-header">
+        <a href="/" class="back-btn" title="Home">&#8592;</a>
+        <h1>Meals</h1>
+    </div>
+
+    <div class="tab-bar">
+        <button class="tab-btn @(_activeTab == "favourites" ? "tab-active" : "")"
+                @onclick='() => _activeTab = "favourites"'>
+            ❤️ Favourites
+        </button>
+        <button class="tab-btn @(_activeTab == "history" ? "tab-active" : "")"
+                @onclick='() => _activeTab = "history"'>
+            📋 History
+        </button>
+    </div>
+
+    @if (_activeTab == "favourites")
+    {
+        var favs = HistorySvc.GetFavourites();
+        @if (!favs.Any())
+        {
+            <div class="empty-state">
+                <div class="empty-icon">🤍</div>
+                <p>No favourites yet. Hit the ♡ on any past meal to save it here.</p>
+            </div>
+        }
+        else
+        {
+            <div class="history-list">
+                @foreach (var entry in favs)
+                {
+                    <div class="history-entry history-entry-clickable"
+                         @key="@(entry.Date + entry.SelectedMeal)"
+                         @onclick="() => OpenDetail(entry)">
+                        <div class="history-entry-main">
+                            @if (!string.IsNullOrEmpty(entry.PhotoFileName))
+                            {
+                                <img src="/meal-photos/@entry.PhotoFileName"
+                                     alt="@entry.SelectedMeal"
+                                     class="photo-thumbnail" />
+                            }
+                            <div style="flex:1; min-width:0;">
+                                <div class="history-date">@entry.Date.ToString("dddd, MMMM d")</div>
+                                <div class="history-title">@entry.SelectedMeal</div>
+                                @if (!string.IsNullOrWhiteSpace(entry.Cuisine))
+                                {
+                                    <div class="history-meals">
+                                        <span class="history-meal-tag">@entry.Cuisine</span>
+                                    </div>
+                                }
+                            </div>
+                            <button class="heart-btn heart-active"
+                                    @onclick:stopPropagation="true"
+                                    @onclick="() => Toggle(entry)"
+                                    title="Remove from favourites">
+                                ❤️
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    }
+    else
+    {
+        var allHistory = HistorySvc.GetAllHistory();
+        @if (!allHistory.Any())
+        {
+            <div class="empty-state">
+                <div class="empty-icon">🍽</div>
+                <p>No sessions yet. Run your first session to see history here.</p>
+                <a href="/session" class="btn btn-primary">Start Tonight's Session →</a>
+            </div>
+        }
+        else
+        {
+            <div class="history-list">
+                @foreach (var entry in allHistory)
+                {
+                    <div class="history-entry history-entry-clickable"
+                         @key="@(entry.Date + entry.SelectedMeal)"
+                         @onclick="() => OpenDetail(entry)">
+                        <div class="history-entry-main">
+                            @if (!string.IsNullOrEmpty(entry.PhotoFileName))
+                            {
+                                <img src="/meal-photos/@entry.PhotoFileName"
+                                     alt="@entry.SelectedMeal"
+                                     class="photo-thumbnail" />
+                            }
+                            <div style="flex:1; min-width:0;">
+                                <div class="history-date">@entry.Date.ToString("dddd, MMMM d")</div>
+                                <div class="history-title">@entry.SelectedMeal</div>
+                                @if (!string.IsNullOrWhiteSpace(entry.Cuisine))
+                                {
+                                    <div class="history-meals">
+                                        <span class="history-meal-tag">@entry.Cuisine</span>
+                                    </div>
+                                }
+                            </div>
+                            <button class="heart-btn @(entry.IsFavourite ? "heart-active" : "")"
+                                    @onclick:stopPropagation="true"
+                                    @onclick="() => Toggle(entry)"
+                                    title="@(entry.IsFavourite ? "Remove from favourites" : "Add to favourites")">
+                                @(entry.IsFavourite ? "❤️" : "🤍")
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    }
+}
+
+</div>
+
+@code {
+    private string _activeTab = "favourites";
+    private MealHistoryEntry? _viewing;
+    private bool _uploading;
+
+    private void OpenDetail(MealHistoryEntry entry) => _viewing = entry;
+    private void CloseDetail() => _viewing = null;
+
+    private void Toggle(MealHistoryEntry entry)
+    {
+        HistorySvc.ToggleFavourite(entry);
+    }
+
+    private static string RatingStars(double rating)
+    {
+        var sb = new System.Text.StringBuilder();
+        for (int i = 1; i <= 5; i++)
+        {
+            if (rating >= i)            sb.Append('★');
+            else if (rating >= i - 0.5) sb.Append('½');
+            else                        sb.Append('☆');
+        }
+        return sb.ToString();
+    }
+
+    private async Task UploadPhoto(InputFileChangeEventArgs e)
+    {
+        if (_viewing == null) return;
+        _uploading = true;
+        StateHasChanged();
+
+        var file = e.File;
+        // Cap at 10 MB
+        using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+        await HistorySvc.SavePhotoAsync(_viewing, stream, file.ContentType);
+
+        _uploading = false;
+        StateHasChanged();
+    }
+}

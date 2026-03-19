@@ -1,0 +1,20 @@
+@* Reusable quiz question card. Renders a question and a set of answer buttons. *@
+
+<div class="quiz-question">
+    <h2 class="quiz-q-text">@Question</h2>
+    <div class="quiz-options">
+        @for (int i = 0; i < Options.Length; i++)
+        {
+            var index = i; // capture for lambda
+            <button class="quiz-option" @onclick="() => OnAnswer.InvokeAsync(index)">
+                @Options[i]
+            </button>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Question { get; set; } = "";
+    [Parameter, EditorRequired] public string[] Options { get; set; } = [];
+    [Parameter, EditorRequired] public EventCallback<int> OnAnswer { get; set; }
+}

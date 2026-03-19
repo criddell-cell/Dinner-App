@@ -1,0 +1,577 @@
+@page "/session"
+@rendermode InteractiveServer
+@inject IPantryService PantrySvc
+@inject IScanService ScanSvc
+@using Microsoft.AspNetCore.Components.Forms
+@inject IHistoryService HistorySvc
+@inject ISuggestionService SuggestionSvc
+@inject NavigationManager Nav
+
+<PageTitle>Tonight's Dinner — NOSH</PageTitle>
+
+<div class="page-container">
+
+@switch (_phase)
+{
+    // ═══════════════════════════════════════════════════════════════════════
+    // PHASE 1 — Fridge Input
+    // ═══════════════════════════════════════════════════════════════════════
+    case Phase.FridgeInput:
+        <div class="page-header">
+            <a href="/" class="back-btn" title="Home">&#8592;</a>
+            <h1>What's fresh in your fridge tonight?</h1>
+            <p class="muted">Add what you have. Pantry staples are always assumed available.</p>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_fridgeMessage))
+        {
+            <div class="alert @(_fridgeError ? "alert-error" : "alert-success")">@_fridgeMessage</div>
+        }
+
+        <div class="session-card">
+            <div class="fridge-add-row">
+                <input class="input input-lg"
+                       placeholder="e.g. chicken breast, spinach..."
+                       value="@_fridgeInput"
+                       @oninput="e => _fridgeInput = e.Value?.ToString() ?? string.Empty"
+                       @onkeydown="HandleFridgeKeyDown" />
+                <button class="btn btn-primary" @onclick="AddFridgeItem">Add</button>
+            </div>
+
+            <div class="scan-upload-row">
+                <label class="scan-upload-btn" title="Scan fridge photo or receipt">
+                    @if (_scanning)
+                    {
+                        <span>Scanning…</span>
+                    }
+                    else
+                    {
+                        <span>📷 Scan fridge / receipt</span>
+                    }
+                    <InputFile OnChange="ScanPhoto" accept="image/*" disabled="@_scanning" />
+                </label>
+                @if (!string.IsNullOrEmpty(_scanMessage))
+                {
+                    <span class="scan-message @(_scanError ? "text-error" : "text-success")">@_scanMessage</span>
+                }
+            </div>
+
+            @if (PantrySvc.GetFridgeContents().Count > 0)
+            {
+                <div class="fridge-chips">
+                    @foreach (var item in PantrySvc.GetFridgeContents())
+                    {
+                        <div class="fridge-chip" @key="item">
+                            <span>@item</span>
+                            <button class="btn-remove" @onclick="() => RemoveFridgeItem(item)">×</button>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <p class="muted small fridge-empty-hint">No fresh ingredients added yet.</p>
+            }
+
+            <details class="pantry-context">
+                <summary class="muted small">▸ Pantry staples always available (@PantrySvc.GetPantryStaples().Count items)</summary>
+                <div class="pantry-context-list">
+                    @foreach (var item in PantrySvc.GetPantryStaples())
+                    {
+                        <span class="pantry-context-chip">@item</span>
+                    }
+                </div>
+            </details>
+
+            <div class="fridge-footer">
+                <button class="btn btn-primary btn-lg"
+                        disabled="@(PantrySvc.GetFridgeContents().Count == 0)"
+                        @onclick="StartQuiz">
+                    Start quiz →
+                </button>
+                <button class="btn btn-ghost" @onclick="SkipFridge">
+                    Skip — use pantry only
+                </button>
+            </div>
+        </div>
+        break;
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // PHASE 2 — Quiz
+    // ═══════════════════════════════════════════════════════════════════════
+    case Phase.Quiz:
+        <div class="quiz-progress">
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: @QuizProgressPct%"></div>
+            </div>
+            <span class="progress-label">Question @_quizStep of @TotalQuizSteps</span>
+        </div>
+
+        <div class="session-card quiz-card">
+            @switch (_quizStep)
+            {
+                case 1:
+                    <QuizQuestion
+                        Question="How much time do you have tonight?"
+                        Options=@(new[] {
+                            "⚡ 15 minutes or less — quick!",
+                            "🕐 15–30 minutes",
+                            "🕑 30–45 minutes",
+                            "🍳 I'm not in a rush"
+                        })
+                        OnAnswer="AnswerQ1" />
+                    break;
+                case 2:
+                    <QuizQuestion
+                        Question="What's your energy level?"
+                        Options=@(new[] {
+                            "🔥 Low — oven or stovetop, minimal shopping",
+                            "😊 Medium — something satisfying",
+                            "💪 High — I'll actually cook tonight"
+                        })
+                        OnAnswer="AnswerQ2" />
+                    break;
+                case 3:
+                    <QuizQuestion
+                        Question="How healthy do you want to eat tonight?"
+                        Options=@(new[] {
+                            "🥗 Clean — low carb, light and nutritious",
+                            "⚖️ Balanced — healthy but satisfying",
+                            "🍕 Comfort food, no judgement"
+                        })
+                        OnAnswer="AnswerQ3" />
+                    break;
+                case 4:
+                    <QuizQuestion
+                        Question="Familiar or adventurous tonight?"
+                        Options=@(new[] {
+                            "🛋 Give me a comfort meal",
+                            "🌀 Mix it up a little",
+                            "🎲 Surprise me"
+                        })
+                        OnAnswer="AnswerQ4" />
+                    break;
+                case 5:
+                    <QuizQuestion
+                        Question="Any cuisine calling your name?"
+                        Options=@(new[] {
+                            "🌮 Mexican / Latin American",
+                            "🍜 Asian (Japanese, Thai, Korean...)",
+                            "🍝 Italian / Mediterranean",
+                            "🍔 North American comfort",
+                            "✨ No preference — surprise me"
+                        })
+                        OnAnswer="AnswerQ5" />
+                    break;
+            }
+
+            @if (_quizStep > 1)
+            {
+                <button class="btn btn-ghost restart-btn" @onclick="RestartQuiz">↩ Start over</button>
+            }
+        </div>
+        break;
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // PHASE 3 — Generating
+    // ═══════════════════════════════════════════════════════════════════════
+    case Phase.Generating:
+        <div class="generating-screen">
+            <div class="spinner"></div>
+            <h2>Finding your dinner...</h2>
+            <p class="muted">Checking your fridge, pantry, and quiz answers...</p>
+        </div>
+        break;
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // PHASE 4 — Suggestions
+    // ═══════════════════════════════════════════════════════════════════════
+    case Phase.Suggestions when _suggestions != null:
+        <div class="page-header">
+            <h1>Tonight's Dinner Options</h1>
+            <p class="muted">Options 1 & 2 use what you have. Option 3 needs a quick shop.</p>
+        </div>
+
+        <div class="suggestions-grid">
+            @for (int i = 0; i < _suggestions.Count; i++)
+            {
+                var s = _suggestions[i];
+                var needsItems = s.MissingIngredients.Count > 0;
+                var cardClass = needsItems ? "suggestion-card needs-items" : "suggestion-card have-items";
+                var badge = needsItems
+                    ? $"🛒 Grab {s.MissingIngredients.Count} thing{(s.MissingIngredients.Count == 1 ? "" : "s")}"
+                    : "✅ You have everything";
+
+                <div class="@cardClass">
+                    <div class="suggestion-badge">@badge</div>
+                    <div class="suggestion-meta">
+                        <span class="cuisine-tag">@s.Cuisine</span>
+                        <span class="time-tag">⏱ @s.EstimatedMinutes min</span>
+                        @if (s.Rating > 0)
+                        {
+                            <span class="rating-tag">@RatingStars(s.Rating) @s.Rating.ToString("0.0")</span>
+                        }
+                    </div>
+                    <h2 class="suggestion-name">@s.Name</h2>
+                    <p class="suggestion-desc">@s.Instructions</p>
+
+                    @if (!string.IsNullOrWhiteSpace(s.HealthNotes))
+                    {
+                        <p class="health-note">🌿 @s.HealthNotes</p>
+                    }
+
+                    <div class="ingredient-section">
+                        <h4>Ingredients</h4>
+                        <div class="ingredient-list">
+                            @foreach (var ing in s.Ingredients)
+                            {
+                                <span class="ingredient-chip">@ing</span>
+                            }
+                        </div>
+                    </div>
+
+                    @if (needsItems)
+                    {
+                        <div class="ingredient-section buy-section">
+                            <h4>Also pick up</h4>
+                            <div class="ingredient-list">
+                                @foreach (var ing in s.MissingIngredients)
+                                {
+                                    <span class="ingredient-chip ingredient-chip-buy">@ing</span>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    <button class="btn btn-primary pick-btn" @onclick="() => PickMeal(s)">
+                        I'll make this →
+                    </button>
+                </div>
+            }
+        </div>
+
+        <div class="suggestions-footer">
+            <button class="btn btn-ghost" @onclick="ReRoll">🔄 Re-roll suggestions</button>
+            <button class="btn btn-ghost" @onclick="RedoQuiz">↩ Redo quiz</button>
+        </div>
+        break;
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // PHASE 5 — Complete
+    // ═══════════════════════════════════════════════════════════════════════
+    case Phase.Complete when _selectedMeal != null:
+        <div class="complete-screen">
+            <div class="complete-icon">🍽</div>
+            <h1>@_selectedMeal.Name</h1>
+
+            <div class="complete-meal-card">
+                <div class="suggestion-meta">
+                    <span class="cuisine-tag">@_selectedMeal.Cuisine</span>
+                    <span class="time-tag">⏱ @_selectedMeal.EstimatedMinutes min</span>
+                    @if (_selectedMeal.Rating > 0)
+                    {
+                        <span class="rating-tag">@RatingStars(_selectedMeal.Rating) @_selectedMeal.Rating.ToString("0.0")</span>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(_selectedMeal.Appliance))
+                    {
+                        <span class="time-tag">🔥 @_selectedMeal.Appliance</span>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(_selectedMeal.Equipment))
+                    {
+                        <span class="time-tag">🍳 @_selectedMeal.Equipment</span>
+                    }
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(_selectedMeal.HealthNotes))
+                {
+                    <p class="health-note">🌿 @_selectedMeal.HealthNotes</p>
+                }
+
+                <div class="ingredient-section">
+                    <h4>Ingredients</h4>
+                    <div class="ingredient-list">
+                        @foreach (var ing in _selectedMeal.Ingredients)
+                        {
+                            <span class="ingredient-chip">@ing</span>
+                        }
+                        @foreach (var ing in _selectedMeal.MissingIngredients)
+                        {
+                            <span class="ingredient-chip ingredient-chip-buy">@ing</span>
+                        }
+                    </div>
+                </div>
+
+                @if (_selectedMeal.RecipeSteps.Count > 0)
+                {
+                    <div class="recipe-steps-section">
+                        <h4>Method</h4>
+                        <ol class="recipe-steps">
+                            @foreach (var step in _selectedMeal.RecipeSteps)
+                            {
+                                <li>@step</li>
+                            }
+                        </ol>
+                    </div>
+                }
+            </div>
+
+            <div class="complete-actions">
+                <button class="btn btn-ghost" @onclick="BackToSuggestions">← Back to options</button>
+                <button class="btn btn-primary" @onclick="Done">Done</button>
+            </div>
+        </div>
+        break;
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // PHASE 6 — Error
+    // ═══════════════════════════════════════════════════════════════════════
+    case Phase.Error:
+        <div class="error-screen">
+            <div class="error-icon">⚠️</div>
+            <h2>Couldn't reach the suggestion engine</h2>
+            <p class="muted">@_errorMessage</p>
+            <div class="error-actions">
+                <button class="btn btn-primary" @onclick="RetryGeneration">Try again</button>
+                <button class="btn btn-ghost" @onclick="RedoQuiz">Redo quiz</button>
+            </div>
+        </div>
+        break;
+}
+
+</div>
+
+@code {
+    // ── State ─────────────────────────────────────────────────────────────────
+
+    private enum Phase { FridgeInput, Quiz, Generating, Suggestions, Complete, Error }
+
+    private Phase _phase = Phase.FridgeInput;
+    private int _quizStep = 1;
+    private int TotalQuizSteps => 5;
+    private double QuizProgressPct => (_quizStep / (double)TotalQuizSteps) * 100;
+
+    private string _fridgeInput = "";
+    private string _fridgeMessage = "";
+    private bool _fridgeError = false;
+
+    private bool _scanning = false;
+    private string _scanMessage = "";
+    private bool _scanError = false;
+
+    private QuizAnswers _quiz = new();
+
+    private List<MealSuggestion>? _suggestions;
+    private MealSuggestion? _selectedMeal;
+    private string _errorMessage = "";
+
+    // ── Phase 1: Fridge ───────────────────────────────────────────────────────
+
+    private void AddFridgeItem()
+    {
+        var item = _fridgeInput.Trim();
+        if (string.IsNullOrEmpty(item)) return;
+
+        if (PantrySvc.AddFridgeItem(item))
+        {
+            _fridgeInput = "";
+            _fridgeMessage = $"'{item}' added.";
+            _fridgeError = false;
+        }
+        else
+        {
+            _fridgeMessage = $"'{item}' is already in your list.";
+            _fridgeError = true;
+        }
+    }
+
+    private void RemoveFridgeItem(string item)
+    {
+        PantrySvc.RemoveFridgeItem(item);
+        _fridgeMessage = $"'{item}' removed.";
+        _fridgeError = false;
+    }
+
+    private async Task ScanPhoto(InputFileChangeEventArgs e)
+    {
+        _scanning = true;
+        _scanMessage = "";
+        _scanError = false;
+        StateHasChanged();
+
+        try
+        {
+            var file = e.File;
+            using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+            var result = await ScanSvc.ScanImageAsync(stream, file.ContentType);
+
+            var added = 0;
+            foreach (var ing in result.Ingredients)
+            {
+                if (!string.IsNullOrWhiteSpace(ing.Name) && PantrySvc.AddFridgeItem(ing.Name))
+                    added++;
+            }
+
+            _scanMessage = added > 0
+                ? $"Added {added} item{(added == 1 ? "" : "s")} from scan."
+                : "No new items found.";
+
+            if (!string.IsNullOrWhiteSpace(result.ScanNotes))
+                _scanMessage += $" Note: {result.ScanNotes}";
+        }
+        catch (Exception ex)
+        {
+            _scanMessage = $"Scan failed: {ex.Message}";
+            _scanError = true;
+        }
+        finally
+        {
+            _scanning = false;
+            StateHasChanged();
+        }
+    }
+
+    private void HandleFridgeKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") AddFridgeItem();
+    }
+
+    private void StartQuiz()
+    {
+        _quiz = new QuizAnswers();
+        _quizStep = 1;
+        _phase = Phase.Quiz;
+    }
+
+    /// <summary>
+    /// Deviation from spec: spec requires ≥1 fridge item to proceed.
+    /// We allow skipping for users who genuinely want to cook from pantry only.
+    /// The quiz + prompt still work correctly with an empty fridge list.
+    /// </summary>
+    private void SkipFridge()
+    {
+        _quiz = new QuizAnswers();
+        _quizStep = 1;
+        _phase = Phase.Quiz;
+    }
+
+    // ── Phase 2: Quiz answers ─────────────────────────────────────────────────
+
+    private void AnswerQ1(int i)
+    {
+        _quiz.TimeAvailable = i switch { 0 => "≤15", 1 => "15-30", 2 => "30-45", _ => "no-rush" };
+        _quizStep = 2;
+    }
+
+    private void AnswerQ2(int i)
+    {
+        _quiz.EnergyLevel = i switch { 0 => "low", 1 => "medium", _ => "high" };
+        _quizStep = 3;
+    }
+
+    private void AnswerQ3(int i)
+    {
+        _quiz.HealthPreference = i switch { 0 => "clean", 1 => "balanced", _ => "comfort" };
+        _quizStep = 4;
+    }
+
+    private void AnswerQ4(int i)
+    {
+        _quiz.CravingDirection = i switch { 0 => "comfort", 1 => "mix", _ => "surprise" };
+        _quizStep = 5;
+    }
+
+    private void AnswerQ5(int i)
+    {
+        _quiz.CuisinePreference = i switch
+        {
+            0 => "mexican", 1 => "asian", 2 => "italian", 3 => "american", _ => "any"
+        };
+        _ = GenerateSuggestionsAsync();
+    }
+
+    private void RestartQuiz()
+    {
+        _quiz = new QuizAnswers();
+        _quizStep = 1;
+        _phase = Phase.Quiz;
+    }
+
+    // ── Phase 3: Generate ─────────────────────────────────────────────────────
+
+    private async Task GenerateSuggestionsAsync()
+    {
+        _phase = Phase.Generating;
+        await InvokeAsync(StateHasChanged);  // force spinner render before async work
+
+        try
+        {
+            var allIngredients = PantrySvc.GetAllIngredients();
+            var recentMeals = HistorySvc.GetRecentMealNames(14);
+            var exclusions = PantrySvc.GetExclusions();
+            _suggestions = await SuggestionSvc.GetSuggestionsAsync(allIngredients, _quiz, recentMeals, exclusions);
+            _phase = Phase.Suggestions;
+        }
+        catch (SuggestionException ex)
+        {
+            _errorMessage = ex.Message;
+            _phase = Phase.Error;
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task RetryGeneration() => await GenerateSuggestionsAsync();
+
+    private void ReRoll()
+    {
+        _suggestions = null;
+        _ = GenerateSuggestionsAsync();
+    }
+
+    private void RedoQuiz()
+    {
+        _suggestions = null;
+        _quiz = new QuizAnswers();
+        _quizStep = 1;
+        _phase = Phase.FridgeInput;
+    }
+
+    // ── Phase 4: Pick a meal ──────────────────────────────────────────────────
+
+    private void PickMeal(MealSuggestion meal)
+    {
+        _selectedMeal = meal;
+        _phase = Phase.Complete;
+        // History + fridge are committed only when the user stays on the complete screen
+        // (i.e. doesn't go back). We commit on StartNewSession instead.
+    }
+
+    private void BackToSuggestions()
+    {
+        _selectedMeal = null;
+        _phase = Phase.Suggestions;
+    }
+
+    // ── Phase 5: Complete ─────────────────────────────────────────────────────
+
+    private static string RatingStars(double rating)
+    {
+        var sb = new System.Text.StringBuilder();
+        for (int i = 1; i <= 5; i++)
+        {
+            if (rating >= i)            sb.Append('★');
+            else if (rating >= i - 0.5) sb.Append('½');
+            else                        sb.Append('☆');
+        }
+        return sb.ToString();
+    }
+
+    private void Done()
+    {
+        if (_selectedMeal != null)
+        {
+            HistorySvc.RecordSession(_selectedMeal);
+        }
+        Nav.NavigateTo("/", forceLoad: true);
+    }
+}

@@ -1,0 +1,116 @@
+@page "/setup"
+@rendermode InteractiveServer
+@inject IPantryService PantrySvc
+@inject NavigationManager Nav
+
+<PageTitle>Welcome — NOSH</PageTitle>
+
+<div class="setup-page">
+    <div class="setup-hero">
+        <div class="setup-icon">🍽</div>
+        <h1>Welcome to NOSH</h1>
+        <p>Every evening, answer 4–5 quick questions and get 3 personalized dinner suggestions — 2 you can make right now, 1 that needs a quick grocery run.</p>
+        <p class="muted">Let's build your pantry staples first. These are the ingredients you always have on hand. You can update this list any time.</p>
+    </div>
+
+    <div class="setup-section">
+        <h2>Your Pantry Staples</h2>
+        <p class="muted small">These defaults cover most weeknight cooking. Remove anything you don't keep stocked, add things you always have.</p>
+
+        @if (!string.IsNullOrEmpty(_message))
+        {
+            <div class="alert @(_isError ? "alert-error" : "alert-success")">@_message</div>
+        }
+
+        <div class="pantry-grid">
+            @foreach (var item in PantrySvc.GetPantryStaples())
+            {
+                <div class="pantry-item" @key="item">
+                    <span>@item</span>
+                    <button class="btn-remove" @onclick="() => RemoveStaple(item)" title="Remove">×</button>
+                </div>
+            }
+        </div>
+
+        <div class="pantry-actions">
+            <div class="add-row">
+                <input class="input"
+                       placeholder="Add a staple..."
+                       value="@_newItem"
+                       @oninput="e => _newItem = e.Value?.ToString() ?? string.Empty"
+                       @onkeydown="HandleKeyDown" />
+                <button class="btn btn-ghost" @onclick="AddStaple">Add</button>
+            </div>
+            <div class="action-row">
+                <button class="btn btn-ghost" @onclick="ResetToDefaults">Reset to defaults</button>
+                <span class="muted small">@PantrySvc.GetPantryStaples().Count items</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="setup-footer">
+        <button class="btn btn-primary btn-lg" @onclick="CompleteSetup"
+                disabled="@(PantrySvc.GetPantryStaples().Count == 0)">
+            I'm ready — let's cook! →
+        </button>
+        <p class="muted small">You can always update your pantry from the Pantry page.</p>
+    </div>
+</div>
+
+@code {
+    private string _newItem = "";
+    private string _message = "";
+    private bool _isError = false;
+
+    protected override void OnInitialized()
+    {
+        // If setup is already done, send straight to the app
+        if (!PantrySvc.IsFirstRun)
+            Nav.NavigateTo("/");
+    }
+
+    private void AddStaple()
+    {
+        var item = _newItem.Trim();
+        if (string.IsNullOrEmpty(item)) return;
+
+        if (PantrySvc.AddStaple(item))
+        {
+            _newItem = "";
+            ShowMessage($"'{item}' added.", false);
+        }
+        else
+        {
+            ShowMessage($"'{item}' is already in your pantry.", true);
+        }
+    }
+
+    private void RemoveStaple(string item)
+    {
+        PantrySvc.RemoveStaple(item);
+        ShowMessage($"'{item}' removed.", false);
+    }
+
+    private void ResetToDefaults()
+    {
+        PantrySvc.ResetToDefaults();
+        ShowMessage("Reset to defaults.", false);
+    }
+
+    private void HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") AddStaple();
+    }
+
+    private void CompleteSetup()
+    {
+        PantrySvc.CompleteSetup();
+        Nav.NavigateTo("/session", forceLoad: true);
+    }
+
+    private void ShowMessage(string msg, bool error)
+    {
+        _message = msg;
+        _isError = error;
+    }
+}
