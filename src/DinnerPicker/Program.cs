@@ -25,7 +25,17 @@ if (!app.Environment.IsDevelopment())
     app.UseExceptionHandler("/Error");
 }
 
-app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        // Tell Cloudflare/browsers not to cache CSS/JS so updates show immediately
+        if (ctx.File.Name.EndsWith(".css") || ctx.File.Name.EndsWith(".js"))
+        {
+            ctx.Context.Response.Headers["Cache-Control"] = "no-cache, must-revalidate";
+        }
+    }
+});
 app.UseAntiforgery();
 
 // Serve meal photos stored outside wwwroot
