@@ -260,10 +260,11 @@ a:hover { text-decoration: underline; }
 .active-user-strip {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.5rem;
   padding: 0.3rem 1.25rem;
-  font-size: 0.8rem;
-  color: rgba(255,255,255,0.9);
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #fff;
   background: none;
   border: none;
   cursor: pointer;
@@ -275,10 +276,10 @@ a:hover { text-decoration: underline; }
 }
 
 .active-user-avatar {
-  width: 1.35rem;
-  height: 1.35rem;
+  width: 1.4rem;
+  height: 1.4rem;
   border-radius: 50%;
-  background: rgba(255,255,255,0.25);
+  background: rgba(255,255,255,0.3);
   color: #fff;
   font-weight: 700;
   font-size: 0.7rem;
@@ -291,18 +292,7 @@ a:hover { text-decoration: underline; }
 
 .active-user-chevron {
   font-size: 1rem !important;
-  opacity: 0.75;
-}
-
-/* active-user-strip is now a button — reset button styles */
-button.active-user-strip {
-  background: none;
-  border: none;
-  cursor: pointer;
-  width: 100%;
-}
-button.active-user-strip:hover {
-  background: rgba(255,255,255,0.12);
+  opacity: 0.6;
 }
 
 /* ── Desktop nav (inside SettingsButton) ────────────────────────────────── */
