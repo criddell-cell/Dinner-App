@@ -4,7 +4,7 @@
     <header class="app-header">
         <a href="/" class="logo">NOSH</a>
         <div class="header-right">
-            <nav>
+            <nav class="desktop-nav">
                 <a href="/session">Tonight's Dinner</a>
                 <a href="/pantry">Pantry</a>
                 <a href="/history">History</a>
@@ -12,6 +12,10 @@
             <SettingsButton />
         </div>
     </header>
+
+    <div class="active-user-bar">
+        <ActiveUserBar />
+    </div>
 
     <main class="app-main">
         @Body

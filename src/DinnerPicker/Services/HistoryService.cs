@@ -6,19 +6,20 @@ namespace DinnerPicker.Services;
 public class HistoryService : IHistoryService
 {
     private readonly IDataStore _store;
-    private readonly AppData _data;
+    private readonly AppData _appData;
 
     public HistoryService(IDataStore store, PantryService pantryService)
     {
         _store = store;
-        // Share the same AppData already loaded by PantryService
-        _data = pantryService.GetAppData();
+        _appData = pantryService.GetAppData();
     }
+
+    private UserProfile Profile => _appData.ActiveProfile;
 
     public List<string> GetRecentMealNames(int days = 14)
     {
         var cutoff = DateTime.Now.AddDays(-days);
-        return _data.MealHistory
+        return Profile.MealHistory
             .Where(e => e.Date >= cutoff)
             .Select(e => e.SelectedMeal)
             .Where(n => !string.IsNullOrWhiteSpace(n))
@@ -27,7 +28,7 @@ public class HistoryService : IHistoryService
 
     public void RecordSession(MealSuggestion selected)
     {
-        _data.MealHistory.Add(new MealHistoryEntry
+        Profile.MealHistory.Add(new MealHistoryEntry
         {
             Date = DateTime.Now,
             SelectedMeal = selected.Name,
@@ -35,31 +36,30 @@ public class HistoryService : IHistoryService
             FullMeal = selected
         });
 
-        // Keep at most 90 entries (~3 months of daily use)
-        if (_data.MealHistory.Count > 90)
-            _data.MealHistory.RemoveRange(0, _data.MealHistory.Count - 90);
+        if (Profile.MealHistory.Count > 90)
+            Profile.MealHistory.RemoveRange(0, Profile.MealHistory.Count - 90);
 
-        _store.Save(_data);
+        _store.Save(_appData);
     }
 
     public IReadOnlyList<MealHistoryEntry> GetAllHistory() =>
-        _data.MealHistory.AsEnumerable().Reverse().ToList().AsReadOnly();
+        Profile.MealHistory.AsEnumerable().Reverse().ToList().AsReadOnly();
 
     public IReadOnlyList<MealHistoryEntry> GetFavourites() =>
-        _data.MealHistory.Where(e => e.IsFavourite).Reverse().ToList().AsReadOnly();
+        Profile.MealHistory.Where(e => e.IsFavourite).Reverse().ToList().AsReadOnly();
 
     public void ToggleFavourite(MealHistoryEntry entry)
     {
-        var match = _data.MealHistory.FirstOrDefault(e =>
+        var match = Profile.MealHistory.FirstOrDefault(e =>
             e.Date == entry.Date && e.SelectedMeal == entry.SelectedMeal);
         if (match == null) return;
         match.IsFavourite = !match.IsFavourite;
-        _store.Save(_data);
+        _store.Save(_appData);
     }
 
     public async Task<string> SavePhotoAsync(MealHistoryEntry entry, Stream stream, string contentType)
     {
-        var match = _data.MealHistory.FirstOrDefault(e =>
+        var match = Profile.MealHistory.FirstOrDefault(e =>
             e.Date == entry.Date && e.SelectedMeal == entry.SelectedMeal);
         if (match == null) return string.Empty;
 
@@ -68,7 +68,6 @@ public class HistoryService : IHistoryService
             ".dinnerpicker", "images");
         Directory.CreateDirectory(dir);
 
-        // Delete old photo file if replacing
         if (!string.IsNullOrEmpty(match.PhotoFileName))
         {
             var old = Path.Combine(dir, match.PhotoFileName);
@@ -77,8 +76,8 @@ public class HistoryService : IHistoryService
 
         var ext = contentType switch
         {
-            "image/png" => ".png",
-            "image/gif" => ".gif",
+            "image/png"  => ".png",
+            "image/gif"  => ".gif",
             "image/webp" => ".webp",
             _ => ".jpg"
         };
@@ -90,14 +89,14 @@ public class HistoryService : IHistoryService
 
         match.PhotoFileName = fileName;
         entry.PhotoFileName = fileName;
-        _store.Save(_data);
+        _store.Save(_appData);
 
         return $"/meal-photos/{fileName}";
     }
 
     public void DeletePhoto(MealHistoryEntry entry)
     {
-        var match = _data.MealHistory.FirstOrDefault(e =>
+        var match = Profile.MealHistory.FirstOrDefault(e =>
             e.Date == entry.Date && e.SelectedMeal == entry.SelectedMeal);
         if (match == null || string.IsNullOrEmpty(match.PhotoFileName)) return;
 
@@ -108,6 +107,6 @@ public class HistoryService : IHistoryService
 
         match.PhotoFileName = null;
         entry.PhotoFileName = null;
-        _store.Save(_data);
+        _store.Save(_appData);
     }
 }

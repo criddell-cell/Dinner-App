@@ -1,10 +1,33 @@
 @rendermode InteractiveServer
 @inject IPantryService PantrySvc
+@inject IUserService UserSvc
+@inject NavigationManager Nav
+@inject SettingsNavigator SettingsNav
+@implements IDisposable
 
-<button class="settings-btn" @onclick="OpenSettings" title="Settings">
+@* ── Gear + hamburger ────────────────────────────────────────────────────── *@
+<button class="settings-btn" @onclick='() => OpenSettings("exclusions")' title="Settings">
     <span class="material-icons">settings</span>
 </button>
+<button class="hamburger-btn" @onclick="ToggleMenu" title="Menu">
+    <span class="material-icons">@(_menuOpen ? "close" : "menu")</span>
+</button>
 
+@* ── Mobile dropdown nav ─────────────────────────────────────────────────── *@
+@if (_menuOpen)
+{
+    <div class="mobile-nav-overlay" @onclick="CloseMenu"></div>
+    <div class="mobile-nav-dropdown">
+        <a href="/session" @onclick="CloseMenu">Tonight's Dinner</a>
+        <a href="/pantry" @onclick="CloseMenu">Pantry</a>
+        <a href="/history" @onclick="CloseMenu">History</a>
+        <button class="mobile-nav-settings" @onclick='() => { CloseMenu(); OpenSettings("exclusions"); }'>
+            <span class="material-icons">settings</span> Settings
+        </button>
+    </div>
+}
+
+@* ── Settings modal ──────────────────────────────────────────────────────── *@
 @if (_showSettings)
 {
     <div class="modal-overlay" @onclick="CloseSettings">
@@ -14,39 +37,102 @@
                 <button class="modal-close" @onclick="CloseSettings">✕</button>
             </div>
 
+            <div class="modal-tabs">
+                <button class="modal-tab @(_tab == "exclusions" ? "modal-tab-active" : "")"
+                        @onclick='() => _tab = "exclusions"'>Exclusions</button>
+                <button class="modal-tab @(_tab == "users" ? "modal-tab-active" : "")"
+                        @onclick='() => _tab = "users"'>Users</button>
+            </div>
+
             <div class="modal-body">
-                <h3>Excluded Ingredients</h3>
-                <p class="muted small">Allergies or foods you dislike. These will never appear in suggestions.</p>
 
-                <div class="exclusion-add-row">
-                    <input class="input"
-                           placeholder="e.g. peanuts, shellfish, mushrooms..."
-                           @bind="_exclusionInput"
-                           @onkeydown="HandleExclusionKey" />
-                    <button class="btn btn-primary" @onclick="AddExclusion">Add</button>
-                </div>
-
-                @if (!string.IsNullOrEmpty(_exclusionMessage))
+                @if (_tab == "exclusions")
                 {
-                    <p class="small @(_exclusionError ? "text-error" : "text-success")">@_exclusionMessage</p>
+                    <h3>Excluded Ingredients</h3>
+                    <p class="muted small">Allergies or foods you dislike. These will never appear in suggestions.</p>
+
+                    <div class="exclusion-add-row">
+                        <input class="input"
+                               placeholder="e.g. peanuts, shellfish, mushrooms..."
+                               @bind="_exclusionInput"
+                               @onkeydown="HandleExclusionKey" />
+                        <button class="btn btn-primary" @onclick="AddExclusion">Add</button>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(_exclusionMessage))
+                    {
+                        <p class="small @(_exclusionError ? "text-error" : "text-success")">@_exclusionMessage</p>
+                    }
+
+                    @if (PantrySvc.GetExclusions().Count > 0)
+                    {
+                        <div class="exclusion-chips">
+                            @foreach (var item in PantrySvc.GetExclusions())
+                            {
+                                <div class="exclusion-chip" @key="item">
+                                    <span>@item</span>
+                                    <button class="btn-remove" @onclick="() => RemoveExclusion(item)">×</button>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="muted small">No exclusions set.</p>
+                    }
                 }
 
-                @if (PantrySvc.GetExclusions().Count > 0)
+                @if (_tab == "users")
                 {
-                    <div class="exclusion-chips">
-                        @foreach (var item in PantrySvc.GetExclusions())
+                    <h3>Users</h3>
+                    <p class="muted small">Each user has their own pantry, fridge, history and exclusions.</p>
+
+                    <div class="user-list">
+                        @foreach (var user in UserSvc.GetUsers())
                         {
-                            <div class="exclusion-chip" @key="item">
-                                <span>@item</span>
-                                <button class="btn-remove" @onclick="() => RemoveExclusion(item)">×</button>
+                            var isActive = user.Id == UserSvc.ActiveUserId;
+                            <div class="user-row @(isActive ? "user-row-active" : "")" @key="user.Id">
+                                <div class="user-row-info">
+                                    <span class="user-avatar">@user.Name[0].ToString().ToUpper()</span>
+                                    <span class="user-name">@user.Name</span>
+                                    @if (isActive)
+                                    {
+                                        <span class="user-active-badge">Active</span>
+                                    }
+                                </div>
+                                <div class="user-row-actions">
+                                    @if (!isActive)
+                                    {
+                                        <button class="btn btn-ghost btn-sm"
+                                                @onclick="() => SwitchUser(user.Id)">
+                                            Switch
+                                        </button>
+                                        @if (UserSvc.GetUsers().Count > 1)
+                                        {
+                                            <button class="btn-remove"
+                                                    @onclick="() => DeleteUser(user.Id)"
+                                                    title="Remove user">×</button>
+                                        }
+                                    }
+                                </div>
                             </div>
                         }
                     </div>
+
+                    <div class="exclusion-add-row" style="margin-top:0.75rem;">
+                        <input class="input"
+                               placeholder="New user name..."
+                               @bind="_newUserName"
+                               @onkeydown="HandleNewUserKey" />
+                        <button class="btn btn-primary" @onclick="AddUser">Add</button>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(_userMessage))
+                    {
+                        <p class="small @(_userError ? "text-error" : "text-success")">@_userMessage</p>
+                    }
                 }
-                else
-                {
-                    <p class="muted small">No exclusions set.</p>
-                }
+
             </div>
         </div>
     </div>
@@ -54,18 +140,45 @@
 
 @code {
     private bool _showSettings;
+    private bool _menuOpen;
+    private string _tab = "exclusions";
+
+    // Exclusions
     private string _exclusionInput = "";
     private string _exclusionMessage = "";
     private bool _exclusionError;
 
-    private void OpenSettings()  => _showSettings = true;
+    // Users
+    private string _newUserName = "";
+    private string _userMessage = "";
+    private bool _userError;
+
+    protected override void OnInitialized()
+    {
+        SettingsNav.OpenRequested += OnOpenRequested;
+    }
+
+    private void OnOpenRequested(string tab)
+    {
+        _tab = tab;
+        _showSettings = true;
+        _menuOpen = false;
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => SettingsNav.OpenRequested -= OnOpenRequested;
+
+    private void OpenSettings(string tab) { _tab = tab; _showSettings = true; _menuOpen = false; }
     private void CloseSettings() => _showSettings = false;
+    private void ToggleMenu() => _menuOpen = !_menuOpen;
+    private void CloseMenu() => _menuOpen = false;
+
+    // ── Exclusions ────────────────────────────────────────────────────────────
 
     private void AddExclusion()
     {
         var item = _exclusionInput.Trim();
         if (string.IsNullOrEmpty(item)) return;
-
         if (PantrySvc.AddExclusion(item))
         {
             _exclusionInput = "";
@@ -86,8 +199,39 @@
         _exclusionError = false;
     }
 
-    private void HandleExclusionKey(KeyboardEventArgs e)
+    private void HandleExclusionKey(KeyboardEventArgs e) { if (e.Key == "Enter") AddExclusion(); }
+
+    // ── Users ─────────────────────────────────────────────────────────────────
+
+    private void AddUser()
     {
-        if (e.Key == "Enter") AddExclusion();
+        var name = _newUserName.Trim();
+        if (string.IsNullOrEmpty(name)) return;
+        if (UserSvc.GetUsers().Any(u => u.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
+        {
+            _userMessage = $"A user named '{name}' already exists.";
+            _userError = true;
+            return;
+        }
+        UserSvc.AddUser(name);
+        _newUserName = "";
+        _userMessage = $"'{name}' added.";
+        _userError = false;
     }
+
+    private void SwitchUser(string userId)
+    {
+        UserSvc.SwitchUser(userId);
+        _showSettings = false;
+        Nav.NavigateTo("/", forceLoad: true);
+    }
+
+    private void DeleteUser(string userId)
+    {
+        UserSvc.DeleteUser(userId);
+        _userMessage = "User removed.";
+        _userError = false;
+    }
+
+    private void HandleNewUserKey(KeyboardEventArgs e) { if (e.Key == "Enter") AddUser(); }
 }

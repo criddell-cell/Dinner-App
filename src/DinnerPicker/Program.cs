@@ -12,8 +12,10 @@ builder.Services.AddSingleton<IDataStore, JsonDataStore>();
 builder.Services.AddSingleton<PantryService>();
 builder.Services.AddSingleton<IPantryService>(sp => sp.GetRequiredService<PantryService>());
 builder.Services.AddSingleton<IHistoryService, HistoryService>();
+builder.Services.AddSingleton<IUserService, UserService>();
 builder.Services.AddTransient<ISuggestionService, SuggestionService>();
 builder.Services.AddTransient<IScanService, ScanService>();
+builder.Services.AddScoped<SettingsNavigator>();
 builder.Services.AddHttpClient();
 
 var app = builder.Build();

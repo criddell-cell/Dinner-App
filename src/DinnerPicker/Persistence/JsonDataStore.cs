@@ -5,13 +5,15 @@ namespace DinnerPicker.Persistence;
 
 /// <summary>
 /// Persists AppData as a single JSON file at ~/.dinnerpicker/appdata.json.
-/// Handles first-run (missing file) and corrupted data gracefully.
+/// Handles first-run (missing file), corrupted data, and migration from the
+/// legacy single-user format.
 /// </summary>
 public class JsonDataStore : IDataStore
 {
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
-        WriteIndented = true
+        WriteIndented = true,
+        PropertyNameCaseInsensitive = true
     };
 
     private readonly string _filePath;
@@ -27,20 +29,25 @@ public class JsonDataStore : IDataStore
     public AppData Load()
     {
         if (!File.Exists(_filePath))
-            return new AppData { IsFirstRun = true };
+            return CreateFresh();
 
         try
         {
             var json = File.ReadAllText(_filePath);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            // Detect legacy single-user format (has PantryStaples at root, no Users key)
+            if (root.TryGetProperty("PantryStaples", out _) && !root.TryGetProperty("Users", out _))
+                return MigrateLegacy(root);
+
             return JsonSerializer.Deserialize<AppData>(json, SerializerOptions)
-                   ?? new AppData { IsFirstRun = true };
+                   ?? CreateFresh();
         }
         catch (Exception ex) when (ex is JsonException or IOException)
         {
-            // Corrupted or unreadable file — start fresh rather than crash.
-            // Back up the bad file so the user can inspect it if needed.
             BackupCorruptedFile();
-            return new AppData { IsFirstRun = true };
+            return CreateFresh();
         }
     }
 
@@ -50,11 +57,47 @@ public class JsonDataStore : IDataStore
         Directory.CreateDirectory(dir);
 
         var json = JsonSerializer.Serialize(data, SerializerOptions);
-        // Write to a temp file first, then replace atomically to avoid
-        // partial writes corrupting the data file on power loss.
         var tmp = _filePath + ".tmp";
         File.WriteAllText(tmp, json);
         File.Move(tmp, _filePath, overwrite: true);
+    }
+
+    private static AppData CreateFresh()
+    {
+        var userId = Guid.NewGuid().ToString("N")[..8];
+        return new AppData
+        {
+            ActiveUserId = userId,
+            Users = new Dictionary<string, UserProfile>
+            {
+                [userId] = new UserProfile { Id = userId, Name = "Me", IsFirstRun = true }
+            }
+        };
+    }
+
+    private static AppData MigrateLegacy(JsonElement root)
+    {
+        var userId = "default";
+        var profile = new UserProfile
+        {
+            Id = userId,
+            Name = "Me",
+            IsFirstRun = root.TryGetProperty("IsFirstRun", out var fr) && fr.GetBoolean(),
+            PantryStaples = root.TryGetProperty("PantryStaples", out var ps)
+                ? ps.Deserialize<List<string>>(SerializerOptions) ?? [] : [],
+            FridgeContents = root.TryGetProperty("FridgeContents", out var fc)
+                ? fc.Deserialize<List<string>>(SerializerOptions) ?? [] : [],
+            MealHistory = root.TryGetProperty("MealHistory", out var mh)
+                ? mh.Deserialize<List<MealHistoryEntry>>(SerializerOptions) ?? [] : [],
+            Exclusions = root.TryGetProperty("Exclusions", out var ex)
+                ? ex.Deserialize<List<string>>(SerializerOptions) ?? [] : []
+        };
+
+        return new AppData
+        {
+            ActiveUserId = userId,
+            Users = new Dictionary<string, UserProfile> { [userId] = profile }
+        };
     }
 
     private void BackupCorruptedFile()
@@ -64,9 +107,6 @@ public class JsonDataStore : IDataStore
             var backup = _filePath + $".corrupted.{DateTime.Now:yyyyMMddHHmmss}";
             File.Move(_filePath, backup);
         }
-        catch
-        {
-            // Best effort — ignore if backup also fails
-        }
+        catch { }
     }
 }

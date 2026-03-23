@@ -1,0 +1,9 @@
+@rendermode InteractiveServer
+@inject IUserService UserSvc
+@inject SettingsNavigator SettingsNav
+
+<button class="active-user-strip" @onclick='() => SettingsNav.Open("users")' title="Manage users">
+    <span class="active-user-avatar">@UserSvc.ActiveUserName[0].ToString().ToUpper()</span>
+    <span class="active-user-label">@UserSvc.ActiveUserName</span>
+    <span class="active-user-chevron material-icons">expand_more</span>
+</button>

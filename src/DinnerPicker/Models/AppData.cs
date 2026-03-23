@@ -1,23 +1,19 @@
+using System.Text.Json.Serialization;
+
 namespace DinnerPicker.Models;
 
 /// <summary>
 /// Root object serialized to ~/.dinnerpicker/appdata.json.
+/// Supports multiple user profiles; ActiveProfile gives the current user's data.
 /// </summary>
 public class AppData
 {
-    public bool IsFirstRun { get; set; } = true;
-    public List<string> PantryStaples { get; set; } = [];
+    public string ActiveUserId { get; set; } = "";
+    public Dictionary<string, UserProfile> Users { get; set; } = new();
 
-    /// <summary>
-    /// Persisted between sessions so the user doesn't re-enter everything.
-    /// Cleared when a session is completed (meal selected).
-    /// </summary>
-    public List<string> FridgeContents { get; set; } = [];
-
-    public List<MealHistoryEntry> MealHistory { get; set; } = [];
-
-    /// <summary>Ingredients the user wants excluded from all suggestions (allergies / dislikes).</summary>
-    public List<string> Exclusions { get; set; } = [];
+    [JsonIgnore]
+    public UserProfile ActiveProfile =>
+        Users.TryGetValue(ActiveUserId, out var p) ? p : Users.Values.First();
 }
 
 /// <summary>

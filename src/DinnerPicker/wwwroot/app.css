@@ -144,6 +144,27 @@ a:hover { text-decoration: underline; }
 }
 .modal-close:hover { color: var(--text); }
 
+.modal-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  padding: 0 1.5rem;
+}
+
+.modal-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 0.6rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.modal-tab:hover { color: var(--primary); }
+.modal-tab-active { color: var(--primary) !important; border-bottom-color: var(--primary) !important; }
+
 .modal-body {
   padding: 1rem 1.5rem 1.5rem;
   display: flex;
@@ -151,6 +172,56 @@ a:hover { text-decoration: underline; }
   gap: 0.75rem;
 }
 .modal-body h3 { margin: 0 0 0.1rem; font-size: 1rem; }
+
+/* ── User list ───────────────────────────────────────────────────────────── */
+.user-list { display: flex; flex-direction: column; gap: 0.5rem; }
+
+.user-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+}
+
+.user-row-active {
+  border-color: var(--primary);
+  background: var(--primary-light);
+}
+
+.user-row-info { display: flex; align-items: center; gap: 0.6rem; }
+.user-row-actions { display: flex; align-items: center; gap: 0.5rem; }
+
+.user-avatar {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.user-row-active .user-avatar { background: var(--primary-dark); }
+
+.user-name { font-weight: 500; font-size: 0.95rem; }
+
+.user-active-badge {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 20px;
+  background: var(--primary);
+  color: #fff;
+  font-weight: 600;
+}
+
+.btn-sm { padding: 0.3rem 0.75rem; font-size: 0.85rem; }
 
 .exclusion-add-row { display: flex; gap: 0.6rem; }
 .exclusion-add-row .input { flex: 1; }
@@ -179,6 +250,138 @@ a:hover { text-decoration: underline; }
   opacity: 0.7;
 }
 .exclusion-chip .btn-remove:hover { opacity: 1; }
+
+.active-user-bar {
+  background: var(--primary);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.active-user-strip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 1.25rem;
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.9);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: background 0.15s;
+}
+.active-user-strip:hover {
+  background: rgba(255,255,255,0.12);
+}
+
+.active-user-avatar {
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.25);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.active-user-label { font-weight: 500; }
+
+.active-user-chevron {
+  font-size: 1rem !important;
+  opacity: 0.75;
+}
+
+/* active-user-strip is now a button — reset button styles */
+button.active-user-strip {
+  background: none;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+}
+button.active-user-strip:hover {
+  background: rgba(255,255,255,0.12);
+}
+
+/* ── Desktop nav (inside SettingsButton) ────────────────────────────────── */
+.desktop-nav {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+.desktop-nav a {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: color 0.15s;
+  text-decoration: none;
+}
+.desktop-nav a:hover { color: var(--primary); }
+
+/* ── Hamburger button ───────────────────────────────────────────────────── */
+.hamburger-btn {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem;
+  color: var(--primary);
+  line-height: 1;
+}
+
+/* ── Mobile nav dropdown ────────────────────────────────────────────────── */
+.mobile-nav-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+}
+
+.mobile-nav-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  min-width: 180px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.mobile-nav-dropdown a,
+.mobile-nav-dropdown .mobile-nav-settings {
+  padding: 0.75rem 1.25rem;
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 500;
+  text-decoration: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: background 0.12s;
+}
+.mobile-nav-dropdown a:hover,
+.mobile-nav-dropdown .mobile-nav-settings:hover {
+  background: var(--primary-light);
+  color: var(--primary);
+  text-decoration: none;
+}
+
+/* ── Responsive: hide/show nav vs hamburger ─────────────────────────────── */
+@media (max-width: 800px) {
+  .app-header .desktop-nav { display: none !important; }
+  .settings-btn { display: none; }
+  .hamburger-btn { display: flex; }
+  .header-right { position: relative; }
+}
 
 .app-main { flex: 1; padding: 2rem 1rem; max-width: 860px; margin: 0 auto; width: 100%; }
 
